@@ -13,18 +13,20 @@ public Plugin myinfo =
 #include <smutils>
 #include <fc_core>
 
-int g_Client[MAXPLAYERS+1][Client_t];
+static int g_Client[MAXPLAYERS+1][Client_t];
 
-int g_iServerId; // Server Id
-int g_iSrvModId; // Server Mod Id
+static int g_iServerId; // Server Id
+static int g_iSrvModId; // Server Mod Id
 
-Database g_MySQL;
+static Database  g_MySQL;
 
-char g_szHostName[128];
+static char g_szHostName[128];
 
-Handle g_fwdServerLoaded;
-Handle g_fwdClientLoaded;
-Handle g_fwdClientSigned;
+static Handle g_fwdServerLoaded;
+static Handle g_fwdClientLoaded;
+static Handle g_fwdClientSigned;
+
+static KeyValues g_KVCache;
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
@@ -61,7 +63,7 @@ public int Native_GetUniqueId(Handle plugin, int numParams)
     int client = GetNativeCell(1);
     if(!ClientIsValid(client, true))
         ThrowNativeError(SP_ERROR_PARAM, "client index %d in invalid.", client);
-    
+
     return g_Client[client][iUniqueId];
 }
 
@@ -70,16 +72,16 @@ public int Native_GetDataArray(Handle plugin, int numParams)
     int client = GetNativeCell(1);
     if(!ClientIsValid(client, true))
         ThrowNativeError(SP_ERROR_PARAM, "client index %d in invalid.", client);
-    
+
     if(g_Client[client][iUniqueId] <= 0)
         return false;
-    
+
     int data[Client_t];
     for(int i = 1; i < view_as<int>(Client_t); ++i)
         data[view_as<Client_t>(i)] = g_Client[client][view_as<Client_t>(i)];
 
     SetNativeArray(2, data[0], sizeof(data));
-    
+
     return true;
 }
 
@@ -90,14 +92,14 @@ public void OnPluginStart()
     SMUtils_SetChatConSnd(true);
 
     g_fwdServerLoaded = CreateGlobalForward("FC_OnServerLoaded",  ET_Ignore, Param_Cell, Param_Cell);
-    g_fwdClientLoaded = CreateGlobalForward("FC_OnClientLoaded",  ET_Ignore, Param_Cell);
+    g_fwdClientLoaded = CreateGlobalForward("FC_OnClientLoaded",  ET_Ignore, Param_Cell, Param_Cell);
     g_fwdClientSigned = CreateGlobalForward("FC_OnClientSigned",  ET_Ignore, Param_Cell, Param_Cell);
 
-    Timer_ReconnectToDatabase(INVALID_HANDLE, 0);
-    
+    CreateTiemr(1.0, Timer_ReconnectToDatabase, 0);
+
     RegConsoleCmd("sm_sign",    Command_Sign);
     RegConsoleCmd("sm_qiandao", Command_Sign);
-    
+
     for(int client = 1; client <= MaxClients; ++client)
         if(ClientIsValid(client))
         {
@@ -150,7 +152,7 @@ public void MySQL_OnConnected(Database db, const char[] error, int retry)
     g_MySQL.SetCharset("utf8mb4");
 
     PrintToServer("Database connected!");
-    
+
     ConVar cvar = FindConVar("sv_hibernate_when_empty");
     if(cvar != null)
         cvar.IntValue = 0;
@@ -231,11 +233,12 @@ public void MySQL_UpdatePasswordCallback(Database db, DBResultSet results, const
     if(results == null || error[0])
         LogError("Update RCon password: %s", error);
 
-    // server loaded
     Call_StartForward(g_fwdServerLoaded);
     Call_PushCell(g_iServerId);
     Call_PushCell(g_iSrvModId);
     Call_Finish();
+    
+    CheckKeyValueCache();
 }
 
 public Action Timer_SQLQueryDelay(Handle timer, DataPack pack)
@@ -270,14 +273,14 @@ public void OnClientPutInServer(int client)
 {
     if(!ClientIsValid(client))
         return;
-    
+
     int steam = GetSteamAccountID(client, true);
     if(steam == 0 && !IsClientInKickQueue(client))
     {
         KickClient(client, "Invalid Steam Account!");
         return;
     }
-    
+
     char m_szQuery[128];
     FormatEx(m_szQuery, 128, "SELECT * FROM `dxg_players` WHERE steamid = '%d';", steam);
     g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, steam, DBPrio_Normal);
@@ -286,7 +289,7 @@ public void OnClientPutInServer(int client)
 public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const char[] error, int steam)
 {
     int client = FindClientByAccount(steam);
-    
+
     if(!ClientIsValid(client))
         return;
 
@@ -298,10 +301,10 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
             
             if(!IsClientInKickQueue(client))
                 KickClient(client, "SteamId is not allow!");
-            
+
             return;
         }
-        
+
         char m_szQuery[128];
         FormatEx(m_szQuery, 128, "SELECT * FROM `dxg_players` WHERE steamid = '%d';", steam);
 
@@ -314,7 +317,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
         CreateTimer(1.0, Timer_SQLQueryDelay, pack);
         return;
     }
-    
+
     if(results.RowCount < 1 || !results.FetchRow())
     {
         char m_szQuery[128];
@@ -322,21 +325,22 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
         g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, steam, DBPrio_Normal);
         return;
     }
-    
+
     g_Client[client][iUniqueId] = results.FetchInt(0);
 
     for(int i = 1; i < view_as<int>(Client_t); ++i)
         g_Client[client][view_as<Client_t>(i)] = results.FetchInt(i+1);
-    
+
     Call_StartForward(g_fwdClientLoaded);
     Call_PushCell(client);
+    Call_PushCell(results.FetchInt(0));
     Call_Finish();
 }
 
 public void MySQL_InsertClientDataCallback(Database db, DBResultSet results, const char[] error, int steam)
 {
     int client = FindClientByAccount(steam);
-    
+
     if(!ClientIsValid(client))
         return;
 
@@ -350,7 +354,7 @@ public void OnClientDisconnect(int client)
 {
     if(g_Client[client][iUniqueId] <= 0)
         return;
-    
+
     char m_szQuery[2048];
     FormatEx(m_szQuery, 2048,  "UPDATE `dxg_players` SET            \
                                 `lastseen` = %d,                    \
@@ -368,14 +372,14 @@ public void OnClientDisconnect(int client)
             );
 
     g_MySQL.Query(MySQL_SaveClientCallback, m_szQuery, _, DBPrio_Low);
-    
+
     OnClientConnected(client);
 }
 
 public void MySQL_SaveClientCallback(Database db, DBResultSet results, const char[] error, any unuse)
 {
     if(results == null || error[0])
-        LogError("MySQL_InsertClientDataCallback -> %s", error);
+        LogError("MySQL_SaveClientCallback -> %s", error);
 }
 
 public Action Command_Sign(int client, int args)
@@ -385,17 +389,17 @@ public Action Command_Sign(int client, int args)
         Chat(client, "Your data haven't beed loaded yet.");
         return Plugin_Handled;
     }
-    
+
     if(g_Client[client][iSignDate] >= GetToday())
     {
         Chat(client, "You've already signed.");
         return Plugin_Handled;
     }
-    
+
     char m_szQuery[256];
     FormatEx(m_szQuery, 256, "UPDATE `dxg_players` SET `signtimes` = `signtimes` + 1, `signdate` = %d WHERE uid = %d", GetToday(), g_Client[client][iUniqueId]);
     g_MySQL.Query(MySQL_SignClientCallback, m_szQuery, GetClientUserId(client), DBPrio_High);
-    
+
     Chat(client, "Processing your request.");
 
     return Plugin_Handled;
@@ -404,7 +408,7 @@ public Action Command_Sign(int client, int args)
 public void MySQL_SignClientCallback(Database db, DBResultSet results, const char[] error, int userid)
 {
     int client = GetClientOfUserId(userid);
-    
+
     if(!ClientIsValid(client))
         return;
 
@@ -416,11 +420,81 @@ public void MySQL_SignClientCallback(Database db, DBResultSet results, const cha
 
     g_Client[client][iSignDate]  = GetToday();
     g_Client[client][iSignTimes]++;
-    
+
     Chat(client, "\x04", "Sign was successful.");
-    
+
     Call_StartForward(g_fwdClientSigned);
     Call_PushCell(client);
     Call_PushCell(g_Client[client][iSignTimes]);
     Call_Finish();
+}
+
+static void CheckKeyValueCache()
+{
+    g_KVCache = new KeyValues("PlayerData", "", "");
+    g_KVCache.ImportFromFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
+
+    if(!g_KVCache.GotoFirstSubKey(true))
+    {
+        CreateTimer(1.0, Timer_SaveCacheToKeyValue, _, TIMER_REPEAT);
+        return;
+    }
+
+    do
+    {
+        int uniqueId = g_KVCache.GetNum("uniqueid", 0);
+        int onlinetk = g_KVCache.GetNum("onlinetk", 0);
+        int lastseen = g_KVCache.GetNum("lastseen", GetTime());
+
+        ImportCacheToDatabase(uniqueId, onlinetk, lastseen);
+    }
+    while(g_KVCache.GotoNextKey(true));
+
+    delete g_KVCache;
+
+    g_KVCache = new KeyValues("PlayerData", "", "");
+    g_KVCache.ExportToFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
+
+    CreateTimer(1.0, Timer_SaveCacheToKeyValue, _, TIMER_REPEAT);
+}
+
+static void ImportCacheToDatabase(int uid, int online, int lastseen)
+{
+    char m_szQuery[2048];
+    FormatEx(m_szQuery, 2048,  "UPDATE `dxg_players` SET            \
+                                `lastseen` = %d,                    \
+                                `connections` = `connections` + 1,  \
+                                `onlinetimes` = `onlinetimes` + %d, \
+                                WHERE                               \
+                                    `uid` = %d,                     \
+                               ",
+                                lastseen,
+                                online,
+                                uid
+            );
+
+    g_MySQL.Query(MySQL_SaveClientCallback, m_szQuery, _, DBPrio_Low);
+}
+
+public Action Timer_SaveCacheToKeyValue(Handle timer)
+{
+    g_KVCache.Rewind();
+    
+    int now = GetTime();
+    
+    char steamid[32];
+    for(int client = 1; client <= MaxClients; ++client)
+        if(g_Client[client][iUniqueId] > 0)
+            if(GetClientAuthId(client, AuthId_Engine, steamid, 32, false))
+            {
+                g_KVCache.JumpToKey(steamid, true);
+                g_KVCache.SetNum("uniqueid", g_Client[client][iUniqueId]);
+                g_KVCache.SetNum("onlinetk", RoundToFloor(GetClientTime(client)));
+                g_KVCache.SetNum("lastseen", now);
+
+                g_KVCache.Rewind();
+            }
+
+    g_KVCache.Rewind();
+    g_KVCache.ExportToFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
 }
