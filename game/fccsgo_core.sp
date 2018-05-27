@@ -13,7 +13,6 @@ public Plugin myinfo =
 #include <smutils>
 #include <fc_core>
 
-
 int g_Client[MAXPLAYERS+1][Client_t];
 
 int g_iServerId; // Server Id
@@ -98,6 +97,28 @@ public void OnPluginStart()
     
     RegConsoleCmd("sm_sign",    Command_Sign);
     RegConsoleCmd("sm_qiandao", Command_Sign);
+    
+    for(int client = 1; client <= MaxClients; ++client)
+        if(ClientIsValid(client))
+        {
+            OnClientConnected(client);
+            OnClientPutInServer(client);
+        }
+}
+
+public void OnConfigsExecuted()
+{
+    ConVar cvar = null;
+    if(GetEngineVersion() == Engine_CSGO)
+    {
+        cvar = FindConVar("host_name_store");
+        if(host_name_store != null)
+            host_name_store.SetInt("1", false, false);
+    }
+
+    cvar = FindConVar("hostname");
+    if(host_name_store != null)
+        cvar.SetString(g_szHostName, false, false);
 }
 
 public Action Timer_ReconnectToDatabase(Handle timer, int retry)
@@ -159,7 +180,7 @@ public void MySQL_ServerDataCallback(Database db, DBResultSet results, const cha
             SetFailState("Query Server Info: %s", error);
             return;
         }
-        
+
         ConVar cvar = null;
 
         cvar = FindConVar("hostip");
@@ -198,6 +219,7 @@ public void MySQL_ServerDataCallback(Database db, DBResultSet results, const cha
 
     char password[24];
     RandomString(password, 24);
+    FindConVar("rcon_password").SetString(password);
 
     char m_szQuery[128];
     FormatEx(m_szQuery, 128, "UPDATE `dxg_servers` SET `rcon`='%s' WHERE `sid`='%d';", password, g_iServerId);
