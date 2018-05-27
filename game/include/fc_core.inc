@@ -19,8 +19,12 @@ native Database FC_Core_GetMySQL();
 native int FC_Core_GetServerId();
 native int FC_Core_GetSrvModId();
 
-native int  FC_Core_GetClientUId(int client, int uid);
+native int  FC_Core_GetClientUId(int client);
 native bool FC_Core_GetClientData(int client, int[] data); // Client_t
+
+forward void FC_OnServerLoaded(int sid, int mod);
+forward void FC_OnClientLoaded(int client, int uid);
+forward void FC_OnClientSigned(int client, int signtimes);
 
 public SharedPlugin __pl_FCCSGO_Core =
 {

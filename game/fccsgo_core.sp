@@ -332,7 +332,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
     if(results.RowCount < 1 || !results.FetchRow())
     {
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "INSERT INTO `k_servers` (`firstjoin`, `steamid`) VALUES ('%d', '%d');", GetTime(), steam);
+        FormatEx(m_szQuery, 128, "INSERT INTO `k_players` (`firstjoin`, `steamid`) VALUES ('%d', '%d');", GetTime(), steam);
         g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, steam, DBPrio_Normal);
         return;
     }
@@ -384,6 +384,17 @@ public void OnClientDisconnect(int client)
 
     MySQL_VoidQuery(m_szQuery);
     OnClientConnected(client);
+    
+    char m_szAuth[32];
+    GetClientAuthId(client, AuthId_Engine, m_szAuth, 32, true);
+    
+    g_KVCache.Rewind();
+    if(g_KVCache.JumpToKey(m_szAuth, false))
+    {
+        g_KVCache.DeleteThis();
+        g_KVCache.Rewind();
+        g_KVCache.ExportToFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
+    }
 }
 
 public Action Command_Sign(int client, int args)
@@ -501,6 +512,8 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
 
     g_KVCache.Rewind();
     g_KVCache.ExportToFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
+    
+    return Plugin_Continue;
 }
 
 static void MySQL_VoidQuery(const char[] m_szQuery)
