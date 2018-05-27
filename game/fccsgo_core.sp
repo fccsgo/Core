@@ -285,21 +285,21 @@ public void OnClientPutInServer(int client)
     if(!ClientIsValid(client))
         return;
 
-    int steam = GetSteamAccountID(client, true);
-    if(steam == 0 && !IsClientInKickQueue(client))
+    char steam[32];
+    if(!GetClientAuthId(client, AuthId_SteamID64, steam, 32, true) && !IsClientInKickQueue(client))
     {
         KickClient(client, "Invalid Steam Account!");
         return;
     }
 
     char m_szQuery[128];
-    FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%d';", steam);
-    g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, steam, DBPrio_Normal);
+    FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%s';", steam);
+    g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, GetClientUserId(client), DBPrio_Normal);
 }
 
-public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const char[] error, int steam)
+public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const char[] error, int userid)
 {
-    int client = FindClientByAccount(steam);
+    int client = GetClientOfUserId(userid);
 
     if(!ClientIsValid(client))
         return;
@@ -317,13 +317,13 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
         }
 
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%d';", steam);
+        FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%d';", userid);
 
         DataPack pack = new DataPack();
         pack.WriteFunction(MySQL_LoadClientDataCallback);
         pack.WriteCell(strlen(m_szQuery)+1);
         pack.WriteString(m_szQuery);
-        pack.WriteCell(steam);
+        pack.WriteCell(userid);
         pack.WriteCell(DBPrio_High);
         CreateTimer(1.0, Timer_SQLQueryDelay, pack);
         return;
@@ -331,9 +331,12 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
 
     if(results.RowCount < 1 || !results.FetchRow())
     {
+        char steam[32];
+        GetClientAuthId(client, AuthId_SteamID64, steam, 32, false);
+        
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "INSERT INTO `k_players` (`firstjoin`, `steamid`) VALUES ('%d', '%d');", GetTime(), steam);
-        g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, steam, DBPrio_Normal);
+        FormatEx(m_szQuery, 128, "INSERT INTO `k_players` (`firstjoin`, `steamid`) VALUES ('%d', '%s');", GetTime(), steam);
+        g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, userid, DBPrio_Normal);
         return;
     }
 
@@ -348,9 +351,9 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
     Call_Finish();
 }
 
-public void MySQL_InsertClientDataCallback(Database db, DBResultSet results, const char[] error, int steam)
+public void MySQL_InsertClientDataCallback(Database db, DBResultSet results, const char[] error, int userid)
 {
-    int client = FindClientByAccount(steam);
+    int client = GetClientOfUserId(userid);
 
     if(!ClientIsValid(client))
         return;
@@ -365,6 +368,9 @@ public void OnClientDisconnect(int client)
 {
     if(g_Client[client][iUniqueId] <= 0)
         return;
+    
+    char steam[32];
+    GetClientAuthId(client, AuthId_SteamID64, steam, 32, false);
 
     char m_szQuery[2048];
     FormatEx(m_szQuery, 2048,  "UPDATE `k_players` SET              \
@@ -374,12 +380,12 @@ public void OnClientDisconnect(int client)
                                 WHERE                               \
                                     `uid` = %d,                     \
                                   AND                               \
-                                    `steamid` = %d                  \
+                                    `steamid` = '%s'                \
                                ",
                                 GetTime(),
                                 RoundToFloor(GetClientTime(client)),
                                 g_Client[client][iUniqueId],
-                                GetSteamAccountID(client)
+                                steam
             );
 
     MySQL_VoidQuery(m_szQuery);
