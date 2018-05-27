@@ -77,7 +77,7 @@ public int Native_GetDataArray(Handle plugin, int numParams)
         return false;
 
     int data[Client_t];
-    for(int i = 1; i < view_as<int>(Client_t); ++i)
+    for(int i = 0; i < view_as<int>(Client_t); ++i)
         data[view_as<Client_t>(i)] = g_Client[client][view_as<Client_t>(i)];
 
     SetNativeArray(2, data[0], sizeof(data));
@@ -95,7 +95,7 @@ public void OnPluginStart()
     g_fwdClientLoaded = CreateGlobalForward("FC_OnClientLoaded",  ET_Ignore, Param_Cell, Param_Cell);
     g_fwdClientSigned = CreateGlobalForward("FC_OnClientSigned",  ET_Ignore, Param_Cell, Param_Cell);
 
-    CreateTiemr(1.0, Timer_ReconnectToDatabase, 0);
+    CreateTimer(1.0, Timer_ReconnectToDatabase, 0);
 
     RegConsoleCmd("sm_sign",    Command_Sign);
     RegConsoleCmd("sm_qiandao", Command_Sign);
@@ -114,12 +114,12 @@ public void OnConfigsExecuted()
     if(GetEngineVersion() == Engine_CSGO)
     {
         cvar = FindConVar("host_name_store");
-        if(host_name_store != null)
-            host_name_store.SetInt("1", false, false);
+        if(cvar != null)
+            cvar.SetInt(1, false, false);
     }
 
     cvar = FindConVar("hostname");
-    if(host_name_store != null)
+    if(cvar != null)
         cvar.SetString(g_szHostName, false, false);
 }
 
@@ -149,7 +149,7 @@ public void MySQL_OnConnected(Database db, const char[] error, int retry)
     }
 
     g_MySQL = db;
-    g_MySQL.SetCharset("utf8mb4");
+    g_MySQL.SetCharset("utf8");
 
     PrintToServer("Database connected!");
 
@@ -169,7 +169,7 @@ public void MySQL_OnConnected(Database db, const char[] error, int retry)
         SetFailState("hostport is invalid CVar");
 
     char m_szQuery[128];
-    FormatEx(m_szQuery, 128, "SELECT * FROM `dxg_servers` WHERE `ip`='%s' AND `port`='%d';", ip, cvar.IntValue);
+    FormatEx(m_szQuery, 128, "SELECT * FROM `k_servers` WHERE `ip`='%s' AND `port`='%d';", ip, cvar.IntValue);
     g_MySQL.Query(MySQL_ServerDataCallback, m_szQuery, _, DBPrio_High);
 }
 
@@ -197,7 +197,7 @@ public void MySQL_ServerDataCallback(Database db, DBResultSet results, const cha
             SetFailState("hostport is invalid CVar");
 
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "SELECT * FROM `dxg_servers` WHERE `ip`='%s' AND `port`='%d';", ip, cvar.IntValue);
+        FormatEx(m_szQuery, 128, "SELECT * FROM `k_servers` WHERE `ip`='%s' AND `port`='%d';", ip, cvar.IntValue);
 
         DataPack pack = new DataPack();
         pack.WriteFunction(MySQL_ServerDataCallback);
@@ -224,7 +224,7 @@ public void MySQL_ServerDataCallback(Database db, DBResultSet results, const cha
     FindConVar("rcon_password").SetString(password);
 
     char m_szQuery[128];
-    FormatEx(m_szQuery, 128, "UPDATE `dxg_servers` SET `rcon`='%s' WHERE `sid`='%d';", password, g_iServerId);
+    FormatEx(m_szQuery, 128, "UPDATE `k_servers` SET `rcon`='%s' WHERE `sid`='%d';", password, g_iServerId);
     g_MySQL.Query(MySQL_UpdatePasswordCallback, m_szQuery, _, DBPrio_High);
 }
 
@@ -263,6 +263,17 @@ public Action Timer_SQLQueryDelay(Handle timer, DataPack pack)
     return Plugin_Stop;
 }
 
+public bool OnClientConnect(int client, char[] rejectmsg, int maxlen)
+{
+    if(g_MySQL == null)
+    {
+        strcopy(rejectmsg, maxlen, "Server is currently unavailable");
+        return false;
+    }
+    
+    return true;
+}
+
 public void OnClientConnected(int client)
 {
     for(int i = 0; i < view_as<int>(Client_t); ++i)
@@ -282,7 +293,7 @@ public void OnClientPutInServer(int client)
     }
 
     char m_szQuery[128];
-    FormatEx(m_szQuery, 128, "SELECT * FROM `dxg_players` WHERE steamid = '%d';", steam);
+    FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%d';", steam);
     g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, steam, DBPrio_Normal);
 }
 
@@ -306,7 +317,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
         }
 
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "SELECT * FROM `dxg_players` WHERE steamid = '%d';", steam);
+        FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%d';", steam);
 
         DataPack pack = new DataPack();
         pack.WriteFunction(MySQL_LoadClientDataCallback);
@@ -321,7 +332,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
     if(results.RowCount < 1 || !results.FetchRow())
     {
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "INSERT INTO `dxg_servers` (`firstjoin`, `steamid`) VALUES ('%d', '%d');", GetTime(), steam);
+        FormatEx(m_szQuery, 128, "INSERT INTO `k_servers` (`firstjoin`, `steamid`) VALUES ('%d', '%d');", GetTime(), steam);
         g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, steam, DBPrio_Normal);
         return;
     }
@@ -356,7 +367,7 @@ public void OnClientDisconnect(int client)
         return;
 
     char m_szQuery[2048];
-    FormatEx(m_szQuery, 2048,  "UPDATE `dxg_players` SET            \
+    FormatEx(m_szQuery, 2048,  "UPDATE `k_players` SET              \
                                 `lastseen` = %d,                    \
                                 `connections` = `connections` + 1,  \
                                 `onlinetimes` = `onlinetimes` + %d, \
@@ -371,15 +382,8 @@ public void OnClientDisconnect(int client)
                                 GetSteamAccountID(client)
             );
 
-    g_MySQL.Query(MySQL_SaveClientCallback, m_szQuery, _, DBPrio_Low);
-
+    MySQL_VoidQuery(m_szQuery);
     OnClientConnected(client);
-}
-
-public void MySQL_SaveClientCallback(Database db, DBResultSet results, const char[] error, any unuse)
-{
-    if(results == null || error[0])
-        LogError("MySQL_SaveClientCallback -> %s", error);
 }
 
 public Action Command_Sign(int client, int args)
@@ -397,7 +401,7 @@ public Action Command_Sign(int client, int args)
     }
 
     char m_szQuery[256];
-    FormatEx(m_szQuery, 256, "UPDATE `dxg_players` SET `signtimes` = `signtimes` + 1, `signdate` = %d WHERE uid = %d", GetToday(), g_Client[client][iUniqueId]);
+    FormatEx(m_szQuery, 256, "UPDATE `k_players` SET `signtimes` = `signtimes` + 1, `signdate` = %d WHERE uid = %d", GetToday(), g_Client[client][iUniqueId]);
     g_MySQL.Query(MySQL_SignClientCallback, m_szQuery, GetClientUserId(client), DBPrio_High);
 
     Chat(client, "Processing your request.");
@@ -460,20 +464,20 @@ static void CheckKeyValueCache()
 
 static void ImportCacheToDatabase(int uid, int online, int lastseen)
 {
-    char m_szQuery[2048];
-    FormatEx(m_szQuery, 2048,  "UPDATE `dxg_players` SET            \
+    char m_szQuery[256];
+    FormatEx(m_szQuery, 256,   "UPDATE `k_players` SET              \
                                 `lastseen` = %d,                    \
                                 `connections` = `connections` + 1,  \
                                 `onlinetimes` = `onlinetimes` + %d, \
                                 WHERE                               \
-                                    `uid` = %d,                     \
+                                    `uid` = %d                      \
                                ",
                                 lastseen,
                                 online,
                                 uid
             );
 
-    g_MySQL.Query(MySQL_SaveClientCallback, m_szQuery, _, DBPrio_Low);
+    MySQL_VoidQuery(m_szQuery);
 }
 
 public Action Timer_SaveCacheToKeyValue(Handle timer)
@@ -497,4 +501,32 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
 
     g_KVCache.Rewind();
     g_KVCache.ExportToFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
+}
+
+static void MySQL_VoidQuery(const char[] m_szQuery)
+{
+    DataPack pack = new DataPack();
+    pack.WriteCell(strlen(m_szQuery)+1);
+    pack.WriteString(m_szQuery);
+    pack.Reset();
+
+    g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, _, DBPrio_Low);
+}
+
+public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char[] error, DataPack pack)
+{
+    if(results == null || error[0])
+    {
+        int maxLen = pack.ReadCell();
+        char[] m_szQuery = new char[maxLen];
+        pack.ReadString(m_szQuery, maxLen);
+        
+        char path[256];
+        BuildPath(Path_SM, path, 256, "log/MySQL_VoidQueryError.log");
+        
+        LogToFileEx(path, "----------------------------------------------------------------");
+        LogToFileEx(path, "Query: %s", m_szQuery);
+        LogToFileEx(path, "Error: %s", error);
+    }
+    delete pack;
 }
