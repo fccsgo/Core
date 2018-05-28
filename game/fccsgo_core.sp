@@ -238,6 +238,7 @@ public void MySQL_UpdatePasswordCallback(Database db, DBResultSet results, const
     Call_PushCell(g_iSrvModId);
     Call_Finish();
     
+    OnConfigsExecuted();
     CheckKeyValueCache();
 }
 
@@ -368,7 +369,7 @@ public void OnClientDisconnect(int client)
 {
     if(g_Client[client][iUniqueId] <= 0)
         return;
-    
+
     char steam[32];
     GetClientAuthId(client, AuthId_SteamID64, steam, 32, false);
 
@@ -376,12 +377,12 @@ public void OnClientDisconnect(int client)
     FormatEx(m_szQuery, 2048,  "UPDATE `k_players` SET              \
                                 `lastseen` = %d,                    \
                                 `connections` = `connections` + 1,  \
-                                `onlinetimes` = `onlinetimes` + %d, \
+                                `onlinetimes` = `onlinetimes` + %d  \
                                 WHERE                               \
-                                    `uid` = %d,                     \
+                                    `uid` = %d                      \
                                   AND                               \
-                                    `steamid` = '%s'                \
-                               ",
+                                    `steamid` = '%s';               \
+                                ",
                                 GetTime(),
                                 RoundToFloor(GetClientTime(client)),
                                 g_Client[client][iUniqueId],
@@ -389,8 +390,7 @@ public void OnClientDisconnect(int client)
             );
 
     MySQL_VoidQuery(m_szQuery);
-    OnClientConnected(client);
-    
+
     char m_szAuth[32];
     GetClientAuthId(client, AuthId_Engine, m_szAuth, 32, true);
     
@@ -401,6 +401,12 @@ public void OnClientDisconnect(int client)
         g_KVCache.Rewind();
         g_KVCache.ExportToFile("addons/sourcemod/data/com.fccsgo.core.playerdata.kv");
     }
+}
+
+public void OnClientDisconnect_Post(int client)
+{
+    for(int i = 0; i < view_as<int>(Client_t); ++i)
+        g_Client[client][view_as<Client_t>(i)] = -1;
 }
 
 public Action Command_Sign(int client, int args)
@@ -529,7 +535,7 @@ static void MySQL_VoidQuery(const char[] m_szQuery)
     pack.WriteString(m_szQuery);
     pack.Reset();
 
-    g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, _, DBPrio_Low);
+    g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, pack, DBPrio_Low);
 }
 
 public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char[] error, DataPack pack)
@@ -541,7 +547,7 @@ public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char
         pack.ReadString(m_szQuery, maxLen);
         
         char path[256];
-        BuildPath(Path_SM, path, 256, "log/MySQL_VoidQueryError.log");
+        BuildPath(Path_SM, path, 256, "logs/MySQL_VoidQueryError.log");
         
         LogToFileEx(path, "----------------------------------------------------------------");
         LogToFileEx(path, "Query: %s", m_szQuery);

@@ -25,6 +25,7 @@ enum stats_t
 
 static bool g_bLoaded[MAXPLAYERS+1];
 
+static int g_iUnique[MAXPLAYERS+1];
 static int g_TotalDB[MAXPLAYERS+1][stats_t];
 static int g_Session[MAXPLAYERS+1][stats_t];
 static Handle  g_tTracking[MAXPLAYERS+1];
@@ -99,9 +100,9 @@ static void ImportCacheToDatabase(int uniqueid, int playtotal, int spectotal, in
                                 `playonct`  = `playonct`  + %d,     \
                                 `playonte`  = `playonte`  + %d,     \
                                 `aliveonct` = `aliveonct` + %d,     \
-                                `aliveonte` = `aliveonte` + %d,     \
+                                `aliveonte` = `aliveonte` + %d      \
                                 WHERE                               \
-                                    `uid` = %d                      \
+                                    `uid` = %d;                     \
                                ",
                                 playtotal,
                                 spectotal,
@@ -148,11 +149,11 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
     
     char steamid[32];
     for(int client = 1; client <= MaxClients; ++client)
-        if(g_bLoaded[client])
+        if(g_bLoaded[client] && g_iUnique[client] > 0)
             if(GetClientAuthId(client, AuthId_Engine, steamid, 32, false))
             {
                 g_KVCache.JumpToKey(steamid, true);
-                g_KVCache.SetNum("uniqueid",  FC_Core_GetClientUId(client));
+                g_KVCache.SetNum("uniqueid",  g_iUnique[client]);
                 g_KVCache.SetNum("playtotal", g_Session[client][iPlayTotal]);
                 g_KVCache.SetNum("spectotal", g_Session[client][iSpecTotal]);
                 g_KVCache.GetNum("playonct",  g_Session[client][iPlayOnCT]);
@@ -182,8 +183,10 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
 
 public void FC_OnClientLoaded(int client, int uid)
 {
+    g_iUnique[client] = uid;
+    
     char m_szQuery[128];
-    Format(m_szQuery, 128, "SELECT * FROM `k_analytics` WHERE uid = '%d';", uid);
+    Format(m_szQuery, 128, "SELECT * FROM `k_stats` WHERE uid = '%d';", g_iUnique[client]);
     g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, GetClientUserId(client));
 }
 
@@ -204,7 +207,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
     if(results.RowCount < 1 || !results.FetchRow())
     {
         char m_szQuery[128];
-        FormatEx(m_szQuery, 128, "INSERT INTO `k_analytics` (`uid`) VALUES ('%d');", FC_Core_GetClientUId(client));
+        FormatEx(m_szQuery, 128, "INSERT INTO `k_stats` (`uid`) VALUES ('%d');", g_iUnique[client]);
         g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, userid, DBPrio_Normal);
         return;
     }
@@ -225,7 +228,7 @@ public Action Timer_ReloadClient(Handle timer, int userid)
     if(!ClientIsValid(client))
         return Plugin_Stop;
     
-    FC_OnClientLoaded(client, FC_Core_GetClientUId(client));
+    FC_OnClientLoaded(client, g_iUnique[client]);
     
     return Plugin_Stop;
 }
@@ -240,7 +243,7 @@ public void MySQL_InsertClientDataCallback(Database db, DBResultSet results, con
     if(results == null || error[0])
         LogError("MySQL_InsertClientDataCallback -> %L -> %s", client, error);
 
-    FC_OnClientLoaded(client, FC_Core_GetClientUId(client));
+    FC_OnClientLoaded(client, g_iUnique[client]);
 }
 
 public void OnClientPutInServer(int client)
@@ -300,9 +303,9 @@ public void OnClientDisconnect(int client)
 {
     StopTimer(g_tTracking[client]);
     
-    if(!g_bLoaded[client])
+    if(!g_bLoaded[client] || g_iUnique[client] < 1)
         return;
-    
+
     char m_szQuery[2048];
     FormatEx(m_szQuery, 2048,  "UPDATE `k_stats` SET                \
                                 `playtotal` = `playtotal` + %d,     \
@@ -310,7 +313,7 @@ public void OnClientDisconnect(int client)
                                 `playonct`  = `playonct`  + %d,     \
                                 `playonte`  = `playonte`  + %d,     \
                                 `aliveonct` = `aliveonct` + %d,     \
-                                `aliveonte` = `aliveonte` + %d,     \
+                                `aliveonte` = `aliveonte` + %d      \
                                 WHERE                               \
                                     `uid` = %d                      \
                                ",
@@ -320,7 +323,7 @@ public void OnClientDisconnect(int client)
                                 g_Session[client][iPlayOnTE],
                                 g_Session[client][iPlayCTAlive],
                                 g_Session[client][iPlayTEAlive],
-                                FC_Core_GetClientUId(client)
+                                g_iUnique[client]
             );
 
     MySQL_VoidQuery(m_szQuery);
@@ -346,7 +349,7 @@ public void OnClientDisconnect(int client)
                                 '%s'            \
                                 );              \
                                ",
-                                FC_Core_GetClientUId(client),
+                                g_iUnique[client],
                                 jointime,
                                 GetToday(jointime),
                                 FC_Core_GetServerId(),
@@ -370,6 +373,12 @@ public void OnClientDisconnect(int client)
     }
 }
 
+public void OnClientDisconnect_Post(int client)
+{
+    g_bLoaded[client] = false;
+    g_iUnique[client] = -1;
+}
+
 static void MySQL_VoidQuery(const char[] m_szQuery)
 {
     DataPack pack = new DataPack();
@@ -377,7 +386,7 @@ static void MySQL_VoidQuery(const char[] m_szQuery)
     pack.WriteString(m_szQuery);
     pack.Reset();
 
-    g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, _, DBPrio_Low);
+    g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, pack, DBPrio_Low);
 }
 
 public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char[] error, DataPack pack)
@@ -389,7 +398,7 @@ public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char
         pack.ReadString(m_szQuery, maxLen);
         
         char path[256];
-        BuildPath(Path_SM, path, 256, "log/MySQL_VoidQueryError.log");
+        BuildPath(Path_SM, path, 256, "logs/MySQL_VoidQueryError.log");
         
         LogToFileEx(path, "----------------------------------------------------------------");
         LogToFileEx(path, "Query: %s", m_szQuery);
