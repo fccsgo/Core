@@ -137,7 +137,6 @@ static void ImportCacheToDatabase(int uniqueid, int playtotal, int spectotal, in
                                 ip
             );
 
-    LogMessage("\n%s", m_szQuery);
     MySQL_VoidQuery(m_szQuery);
 }
 
@@ -188,6 +187,7 @@ public void FC_OnClientLoaded(int client, int uid)
     
     char m_szQuery[128];
     Format(m_szQuery, 128, "SELECT * FROM `k_stats` WHERE uid = '%d';", g_iUnique[client]);
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, GetClientUserId(client));
 }
 
@@ -209,6 +209,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
     {
         char m_szQuery[128];
         FormatEx(m_szQuery, 128, "INSERT INTO `k_stats` (`uid`) VALUES ('%d');", g_iUnique[client]);
+        LogSQL(m_szQuery);
         g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, userid, DBPrio_Normal);
         return;
     }
@@ -387,6 +388,7 @@ static void MySQL_VoidQuery(const char[] m_szQuery)
     pack.WriteString(m_szQuery);
     pack.Reset();
 
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, pack, DBPrio_Low);
 }
 
@@ -406,4 +408,9 @@ public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char
         LogToFileEx(path, "Error: %s", error);
     }
     delete pack;
+}
+
+static void LogSQL(const char[] buffer)
+{
+    LogToFileEx("addons/sourcemod/data/MySQL_Query.log", buffer);
 }

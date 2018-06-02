@@ -170,6 +170,7 @@ public void MySQL_OnConnected(Database db, const char[] error, int retry)
 
     char m_szQuery[128];
     FormatEx(m_szQuery, 128, "SELECT * FROM `k_servers` WHERE `ip`='%s' AND `port`='%d';", ip, cvar.IntValue);
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_ServerDataCallback, m_szQuery, _, DBPrio_High);
 }
 
@@ -225,6 +226,7 @@ public void MySQL_ServerDataCallback(Database db, DBResultSet results, const cha
 
     char m_szQuery[128];
     FormatEx(m_szQuery, 128, "UPDATE `k_servers` SET `rcon`='%s' WHERE `sid`='%d';", password, g_iServerId);
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_UpdatePasswordCallback, m_szQuery, _, DBPrio_High);
 }
 
@@ -259,6 +261,7 @@ public Action Timer_SQLQueryDelay(Handle timer, DataPack pack)
         return Plugin_Stop;
     }
 
+    LogSQL(m_szQuery);
     g_MySQL.Query(callback, m_szQuery, cell, prio);
 
     return Plugin_Stop;
@@ -295,6 +298,7 @@ public void OnClientPutInServer(int client)
 
     char m_szQuery[128];
     FormatEx(m_szQuery, 128, "SELECT * FROM `k_players` WHERE steamid = '%s';", steam);
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_LoadClientDataCallback, m_szQuery, GetClientUserId(client), DBPrio_Normal);
 }
 
@@ -337,6 +341,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
         
         char m_szQuery[128];
         FormatEx(m_szQuery, 128, "INSERT INTO `k_players` (`firstjoin`, `steamid`) VALUES ('%d', '%s');", GetTime(), steam);
+        LogSQL(m_szQuery);
         g_MySQL.Query(MySQL_InsertClientDataCallback, m_szQuery, userid, DBPrio_Normal);
         return;
     }
@@ -425,6 +430,7 @@ public Action Command_Sign(int client, int args)
 
     char m_szQuery[256];
     FormatEx(m_szQuery, 256, "UPDATE `k_players` SET `signtimes` = `signtimes` + 1, `signdate` = %d WHERE uid = %d", GetToday(), g_Client[client][iUniqueId]);
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_SignClientCallback, m_szQuery, GetClientUserId(client), DBPrio_High);
 
     Chat(client, "Processing your request.");
@@ -535,6 +541,7 @@ static void MySQL_VoidQuery(const char[] m_szQuery)
     pack.WriteString(m_szQuery);
     pack.Reset();
 
+    LogSQL(m_szQuery);
     g_MySQL.Query(MySQL_VoidQueryCallback, m_szQuery, pack, DBPrio_Low);
 }
 
@@ -554,4 +561,9 @@ public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char
         LogToFileEx(path, "Error: %s", error);
     }
     delete pack;
+}
+
+static void LogSQL(const char[] buffer)
+{
+    LogToFileEx("addons/sourcemod/data/MySQL_Query.log", buffer);
 }
