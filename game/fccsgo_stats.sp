@@ -3,7 +3,7 @@ public Plugin myinfo =
     name        = "FC - Stats and Analytics",
     author      = "Kyle \"Kxnrl\" Frankiss",
     description = "Stats and Analytics system of FC community",
-    version     = "1.0",
+    version     = "1.0.1",
     url         = "https://kxnrl.com"
 };
 
@@ -137,6 +137,7 @@ static void ImportCacheToDatabase(int uniqueid, int playtotal, int spectotal, in
                                 ip
             );
 
+    LogMessage("\n%s", m_szQuery);
     MySQL_VoidQuery(m_szQuery);
 }
 
@@ -156,14 +157,14 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
                 g_KVCache.SetNum("uniqueid",  g_iUnique[client]);
                 g_KVCache.SetNum("playtotal", g_Session[client][iPlayTotal]);
                 g_KVCache.SetNum("spectotal", g_Session[client][iSpecTotal]);
-                g_KVCache.GetNum("playonct",  g_Session[client][iPlayOnCT]);
-                g_KVCache.GetNum("playonte",  g_Session[client][iPlayOnTE]);
-                g_KVCache.GetNum("playoncta", g_Session[client][iPlayCTAlive]);
-                g_KVCache.GetNum("playontea", g_Session[client][iPlayTEAlive]);
+                g_KVCache.SetNum("playonct",  g_Session[client][iPlayOnCT]);
+                g_KVCache.SetNum("playonte",  g_Session[client][iPlayOnTE]);
+                g_KVCache.SetNum("playoncta", g_Session[client][iPlayCTAlive]);
+                g_KVCache.SetNum("playontea", g_Session[client][iPlayTEAlive]);
 
                 char ip[24];
                 GetClientIP(client, ip, 24, true);
-                g_KVCache.GetString("ip",  ip, 24);
+                g_KVCache.SetString("ip",  ip);
                 g_KVCache.SetString("map", map);
                 
                 int duration = RoundToFloor(GetClientTime(client));
@@ -213,7 +214,7 @@ public void MySQL_LoadClientDataCallback(Database db, DBResultSet results, const
     }
     
     for(int i = 0; i < view_as<int>(stats_t); ++i)
-        g_TotalDB[client][view_as<stats_t>(i)] = 0; //results.FetchInt(i+1);
+        g_TotalDB[client][view_as<stats_t>(i)] = results.FetchInt(i+2);
     
     for(int i = 0; i < view_as<int>(stats_t); ++i)
         g_TotalDB[client][view_as<stats_t>(i)] += g_Session[client][view_as<stats_t>(i)];

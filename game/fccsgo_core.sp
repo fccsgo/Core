@@ -3,7 +3,7 @@ public Plugin myinfo =
     name        = "FC - Core",
     author      = "Kyle \"Kxnrl\" Frankiss",
     description = "Core framwork of FC community",
-    version     = "1.0",
+    version     = "1.0.1",
     url         = "https://kxnrl.com"
 };
 
@@ -491,7 +491,7 @@ static void ImportCacheToDatabase(int uid, int online, int lastseen)
     FormatEx(m_szQuery, 256,   "UPDATE `k_players` SET              \
                                 `lastseen` = %d,                    \
                                 `connections` = `connections` + 1,  \
-                                `onlinetimes` = `onlinetimes` + %d, \
+                                `onlinetimes` = `onlinetimes` + %d  \
                                 WHERE                               \
                                     `uid` = %d                      \
                                ",
