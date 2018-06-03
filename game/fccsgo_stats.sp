@@ -3,7 +3,7 @@ public Plugin myinfo =
     name        = "FC - Stats and Analytics",
     author      = "Kyle \"Kxnrl\" Frankiss",
     description = "Stats and Analytics system of FC community",
-    version     = "1.0.1",
+    version     = "1.0.2",
     url         = "https://kxnrl.com"
 };
 
@@ -25,6 +25,7 @@ enum stats_t
 
 static bool g_bLoaded[MAXPLAYERS+1];
 
+static int g_iJoined[MAXPLAYERS+1];
 static int g_iUnique[MAXPLAYERS+1];
 static int g_TotalDB[MAXPLAYERS+1][stats_t];
 static int g_Session[MAXPLAYERS+1][stats_t];
@@ -166,7 +167,7 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
                 g_KVCache.SetString("ip",  ip);
                 g_KVCache.SetString("map", map);
                 
-                int duration = RoundToFloor(GetClientTime(client));
+                int duration = g_iJoined[client];
                 int jointime = GetTime() - duration;
 
                 g_KVCache.SetNum("jointime", jointime);
@@ -184,7 +185,8 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
 public void FC_OnClientLoaded(int client, int uid)
 {
     g_iUnique[client] = uid;
-    
+    g_iJoined[client] = GetTime();
+
     char m_szQuery[128];
     Format(m_szQuery, 128, "SELECT * FROM `k_stats` WHERE uid = '%d';", g_iUnique[client]);
     LogSQL(m_szQuery);
@@ -305,7 +307,7 @@ public void OnClientDisconnect(int client)
 {
     StopTimer(g_tTracking[client]);
     
-    if(!g_bLoaded[client] || g_iUnique[client] < 1)
+    if(!g_bLoaded[client] || g_iUnique[client] < 1 || g_iJoined[client] < 1)
         return;
 
     char m_szQuery[2048];
@@ -330,7 +332,7 @@ public void OnClientDisconnect(int client)
 
     MySQL_VoidQuery(m_szQuery);
     
-    int duration = RoundToFloor(GetClientTime(client));
+    int duration = g_iJoined[client];
     int jointime = GetTime() - duration;
     
     char map[128];
@@ -379,6 +381,7 @@ public void OnClientDisconnect_Post(int client)
 {
     g_bLoaded[client] = false;
     g_iUnique[client] = -1;
+    g_iJoined[client] = -1;
 }
 
 static void MySQL_VoidQuery(const char[] m_szQuery)
