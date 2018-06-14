@@ -166,12 +166,9 @@ public Action Timer_SaveCacheToKeyValue(Handle timer)
                 GetClientIP(client, ip, 24, true);
                 g_KVCache.SetString("ip",  ip);
                 g_KVCache.SetString("map", map);
-                
-                int duration = g_iJoined[client];
-                int jointime = GetTime() - duration;
 
-                g_KVCache.SetNum("jointime", jointime);
-                g_KVCache.SetNum("duration", duration);
+                g_KVCache.SetNum("jointime", g_iJoined[client]);
+                g_KVCache.SetNum("duration", GetClientOnline(client));
 
                 g_KVCache.Rewind();
             }
@@ -307,7 +304,7 @@ public void OnClientDisconnect(int client)
 {
     StopTimer(g_tTracking[client]);
     
-    if(!g_bLoaded[client] || g_iUnique[client] < 1 || g_iJoined[client] < 1)
+    if(!g_bLoaded[client] || g_iUnique[client] < 1 || g_iJoined[client] < 1 || GetClientOnline(client) > 65535)
         return;
 
     char m_szQuery[2048];
@@ -331,10 +328,7 @@ public void OnClientDisconnect(int client)
             );
 
     MySQL_VoidQuery(m_szQuery);
-    
-    int duration = g_iJoined[client];
-    int jointime = GetTime() - duration;
-    
+
     char map[128];
     GetCurrentMap(map, 128);
     
@@ -354,12 +348,12 @@ public void OnClientDisconnect(int client)
                                 );              \
                                ",
                                 g_iUnique[client],
-                                jointime,
-                                GetToday(jointime),
+                                g_iJoined[client],
+                                GetToday(g_iJoined[client]),
                                 FC_Core_GetServerId(),
                                 FC_Core_GetSrvModId(),
                                 map,
-                                duration,
+                                GetClientOnline(client),
                                 ip
             );
 
@@ -411,6 +405,11 @@ public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char
         LogToFileEx(path, "Error: %s", error);
     }
     delete pack;
+}
+
+static int GetClientOnline(int client)
+{
+    return GetTime() - g_iJoined[client];
 }
 
 static void LogSQL(const char[] buffer)
