@@ -3,7 +3,7 @@ public Plugin myinfo =
     name        = "FC - Core",
     author      = "Kyle \"Kxnrl\" Frankiss",
     description = "Core framwork of FC community",
-    version     = "1.0.2",
+    version     = "1.0.3",
     url         = "https://kxnrl.com"
 };
 

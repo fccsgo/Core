@@ -3,7 +3,7 @@ public Plugin myinfo =
     name        = "FC - Stats and Analytics",
     author      = "Kyle \"Kxnrl\" Frankiss",
     description = "Stats and Analytics system of FC community",
-    version     = "1.0.2",
+    version     = "1.0.3",
     url         = "https://kxnrl.com"
 };
 
