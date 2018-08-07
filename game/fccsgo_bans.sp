@@ -1,22 +1,20 @@
-public Plugin myinfo = 
-{
-    name        = "FC - Bans",
-    author      = "Kyle \"Kxnrl\" Frankiss",
-    description = "Banning and Admin system of FC community",
-    version     = "1.0.3",
-    url         = "https://kxnrl.com"
-};
-
 #pragma semicolon 1
 #pragma newdecls required
 
 #include <smutils>
 #include <fc_core>
 
-#undef REQUIRE_PLUGIN
+public Plugin myinfo = 
+{
+    name        = "FC - Bans",
+    author      = "Kyle \"Kxnrl\" Frankiss",
+    description = "Banning and Admin system of FC community",
+    version     = PI_VERSION,
+    url         = "https://kxnrl.com"
+};
+
+
 #include <adminmenu>
-#include <topmenus>
-#define REQUIRE_PLUGIN
 
 enum ban_f
 {
@@ -574,7 +572,8 @@ public Action Command_Ban(int client, int args)
 
 public void OnAdminMenuReady(Handle topmenu)
 {
-    TopMenu menu = view_as<TopMenu>(topmenu);
+    TopMenu menu = TopMenu.FromHandle(topmenu);
+
     if(menu == g_hTopMenu)
         return;
 

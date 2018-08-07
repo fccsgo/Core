@@ -1,17 +1,18 @@
-public Plugin myinfo = 
-{
-    name        = "FC - Core",
-    author      = "Kyle \"Kxnrl\" Frankiss",
-    description = "Core framwork of FC community",
-    version     = "1.0.3",
-    url         = "https://kxnrl.com"
-};
-
 #pragma semicolon 1
 #pragma newdecls required
 
 #include <smutils>
 #include <fc_core>
+
+public Plugin myinfo = 
+{
+    name        = "FC - Core",
+    author      = "Kyle \"Kxnrl\" Frankiss",
+    description = "Core framwork of FC community",
+    version     = PI_VERSION,
+    url         = "https://kxnrl.com"
+};
+
 
 static int g_Client[MAXPLAYERS+1][Client_t];
 

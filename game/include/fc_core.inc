@@ -4,6 +4,8 @@
 
 #define _FC_Core_Include_
 
+#define PI_VERSION "1.0.4"
+
 enum Client_t
 {
     iUniqueId,

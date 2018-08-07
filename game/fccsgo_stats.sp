@@ -1,17 +1,18 @@
-public Plugin myinfo = 
-{
-    name        = "FC - Stats and Analytics",
-    author      = "Kyle \"Kxnrl\" Frankiss",
-    description = "Stats and Analytics system of FC community",
-    version     = "1.0.3",
-    url         = "https://kxnrl.com"
-};
-
 #pragma semicolon 1
 #pragma newdecls required
 
 #include <smutils>
 #include <fc_core>
+
+public Plugin myinfo = 
+{
+    name        = "FC - Stats and Analytics",
+    author      = "Kyle \"Kxnrl\" Frankiss",
+    description = "Stats and Analytics system of FC community",
+    version     = PI_VERSION,
+    url         = "https://kxnrl.com"
+};
+
 
 enum stats_t
 {
