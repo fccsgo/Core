@@ -15,7 +15,7 @@ public Plugin myinfo =
 
 
 Handle g_hSyncHud = null;
-Panel g_hMenuHud = null;
+Panel  g_hMenuHud = null;
 
 public void OnPluginStart()
 {
@@ -26,12 +26,31 @@ public void OnPluginStart()
     SMUtils_SetTextDest(HUD_PRINTCENTER);
 
     g_hSyncHud = CreateHudSynchronizer();
+    
+    RegAdminCmd("sm_chat", Command_Chat, ADMFLAG_CHAT);
+}
+
+public Action Command_Chat(int client, int args)
+{
+    if(!client)
+        return Plugin_Handled;
+    
+    Chat(client, "管理员喊话用法:");
+    Chat(client, "ASay: @内容");
+    Chat(client, "CSay: #内容");
+    Chat(client, "HSay: $内容");      
+    Chat(client, "MSay: %%内容");
+    
+    return Plugin_Handled;
 }
 
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
 {
     if(!ClientIsValid(client))
         return Plugin_Continue;
+    
+    if(strlen(sArgs) <= 3)
+        return Plugin_Handled;
 
     if(strcmp(command, "say", false) == 0)
     {
@@ -53,7 +72,7 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
             case '@': Utils_Psay(client, sArgs[1]);
             default : return Plugin_Continue;
         }
-        
+
         return Plugin_Handled;
     }
 
@@ -62,6 +81,9 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
 
 void Utils_Asay(int client, const char[] message)
 {
+    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
+        return;
+    
     SetHudTextParams(-1.0, 0.225, 8.0, 255, 0, 0, 255, 1, 5.0, 1.0, 2.0);
 
     for(int target = 1; target <= MaxClients; ++target)
@@ -79,18 +101,27 @@ void Utils_Asay(int client, const char[] message)
 
 void Utils_Csay(int client, const char[] message)
 {
+    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
+        return;
+    
     TextAll("<font color='#0066CC'><span class='fontSize-xl'>%N</span></font>\n%s", client, message);
     LogAction(client, -1, "\"%L\" 使用CSAY: %s", client, message);
 }
 
 void Utils_Hsay(int client, const char[] message)
 {
+    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
+        return;
+    
     HintAll("<font color='#0066CC'><span class='fontSize-xl'>%N</span></font>\n%s", client, message);
     LogAction(client, -1, "\"%L\" 使用HSAY: %s", client, message);
 }
 
 void Utils_Msay(int client, const char[] message)
 {
+    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
+        return;
+
     if(g_hMenuHud != null)
         delete g_hMenuHud;
     

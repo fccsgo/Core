@@ -3,6 +3,7 @@
 
 #include <smutils>
 #include <fc_core>
+#include <fc_bans>
 
 public Plugin myinfo = 
 {
@@ -664,6 +665,7 @@ public int MenuHandler_BanTime(Menu menu, MenuAction action, int admin, int slot
         }
 
         g_eBan[admin][bListen] = true;
+        Chat(admin, "请按Y输入封禁原因!");
     }
 }
 
@@ -765,9 +767,9 @@ public void CheckBanCallback(Database db, DBResultSet results, const char[] erro
         /* process results */
         
         // if ban has expired
-        if(GetTime() > (bCreated + bLength))
+        if((GetTime() > (bCreated + bLength)) && bLength > 0)
             continue;
-        
+
         // if srv ban and current server id != ban server id
         if(bType == 2 && FC_Core_GetServerId() != bSrv)
             continue;
@@ -775,11 +777,11 @@ public void CheckBanCallback(Database db, DBResultSet results, const char[] erro
         // if mod ban and current server mod != ban mod id
         if(bType == 1 && FC_Core_GetSrvModId() != bSrvMod)
             continue;
-        
+ 
         char ip[32];
         GetClientIP(client, ip, 32);
-        
-        SQL_VoidQuery(db, "INSERT INTO dxg_blocks VALUES (DEFAULT, %d, '%s', %d)", results.FetchInt(6), ip, GetTime());
+
+        SQL_VoidQuery(db, "INSERT INTO k_blocks VALUES (DEFAULT, %d, '%s', %d)", results.FetchInt(6), ip, GetTime());
 
         char timeExpired[64];
         if(bLength != 0)
@@ -788,7 +790,7 @@ public void CheckBanCallback(Database db, DBResultSet results, const char[] erro
             FormatEx(timeExpired, 64, "永久封禁");
 
         char kickReason[256];
-        FormatEx(kickReason, 256, "您已被服务器封锁,禁止进入游戏!\n类型: %s\n原因: %s\n到期: %s\n访问https://ban.magicgirl.net/查看详细信息", g_banType[bType], bReason, timeExpired);
+        FormatEx(kickReason, 256, "您已被服务器封锁,禁止进入游戏!\n类型: %s\n原因: %s\n到期: %s\n访问https://fccsgo.com/查看详细信息", g_banType[bType], bReason, timeExpired);
         BanClient(client, 10, BANFLAG_AUTHID, kickReason, kickReason);
 
         break;

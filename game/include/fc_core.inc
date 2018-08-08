@@ -4,7 +4,7 @@
 
 #define _FC_Core_Include_
 
-#define PI_VERSION "1.0.4"
+#define PI_VERSION "1.0.5"
 
 enum Client_t
 {
