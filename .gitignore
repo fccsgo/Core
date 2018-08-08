@@ -76,6 +76,7 @@ game/include/version_auto.inc
 game/include/system2.inc
 game/include/system2/legacy.inc
 game/include/system2/request.inc
+game/include/smutils.inc
 
 # OSX
 # =========================
