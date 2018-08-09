@@ -205,7 +205,7 @@ public Action OnMapStartPost(Handle timer)
 
     char exp[2][8];
     ExplodeString(map, "_", exp, 2, 8, true);
-    FormatEx(g_szDemoName, 128, "%s_%s_%s", exp[0], time, map);
+    FormatEx(g_szDemoName, 128, "%s_%d_%s_%s", exp[0], FC_Core_GetServerId(), time, map);
 
     ServerCommand("tv_record recording/%s.dem", g_szDemoName);
 
@@ -231,7 +231,7 @@ public Action Timer_RecTime(Handle timer)
 
 public Action Timer_Broadcast(Handle timer)
 {    
-    ChatAll("\x10当前DEMO名称\x04[\x0F%s\x04]", g_szDemoName);
+    ChatAll("\x10DEMO名称\x04[\x0F%s\x04]", g_szDemoName);
     return Plugin_Continue;
 }
 
@@ -245,15 +245,15 @@ public Action Command_Demo(int client, int args)
 
     char szTime[32];
     FormatTime(szTime, 32, "%M:%S", g_iRecTime-2);
-    ChatAll("\x10当前DEMO名称\x04[\x0F%s\x04]", g_szDemoName);
-    ChatAll("\x10当前时间\x04[\x0F%s\x04]", szTime);
+    ChatAll("\x10DEMO名称\x04[\x0F%s\x04]", g_szDemoName);
+    ChatAll("\x10DEMO时间\x04[\x0F%s\x04]", szTime);
 
     return Plugin_Handled;
 }
 
 public void Event_RoundStart(Event event, const char[] name, bool DB)
 {    
-    if(g_bRecording) CreateTimer(5.0, Timer_Broadcast);
+    if(g_bRecording) CreateTimer(15.0, Timer_Broadcast);
 }
 
 public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -272,7 +272,7 @@ static bool CheckAllowRecord()
     int players;
 
     for(int i = 1; i <= MaxClients; ++i)
-        if(IsClientConnected(i))
+        if(IsClientConnected(i) && !IsFakeClient(i))
             players++;
 
     if(players < 3)

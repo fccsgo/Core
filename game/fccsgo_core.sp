@@ -105,7 +105,7 @@ public void OnPluginStart()
         if(ClientIsValid(client))
         {
             OnClientConnected(client);
-            OnClientPutInServer(client);
+            OnClientPostAdminCheck(client);
         }
 }
 
@@ -285,7 +285,7 @@ public void OnClientConnected(int client)
         g_Client[client][view_as<Client_t>(i)] = -1;
 }
 
-public void OnClientPutInServer(int client)
+public void OnClientPostAdminCheck(int client)
 {
     if(!ClientIsValid(client))
         return;
@@ -368,7 +368,7 @@ public void MySQL_InsertClientDataCallback(Database db, DBResultSet results, con
     if(results == null || error[0])
         LogError("MySQL_InsertClientDataCallback -> %L -> %s", client, error);
 
-    OnClientPutInServer(client);
+    OnClientPostAdminCheck(client);
 }
 
 public void OnClientDisconnect(int client)

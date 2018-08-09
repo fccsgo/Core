@@ -88,7 +88,7 @@ bool Util_BanClient(int admin, int target, int btype, int length, const char[] r
 
     char steamid[32], name[64], adminNick[64];
     int adminUserId = -1;
-    
+
     if(admin > 0)
     {
         GetClientAuthId(admin, AuthId_Engine, steamid, 32);
@@ -384,10 +384,12 @@ public void OnPluginStart()
     g_smUserIPpt = new StringMap();
 
     RegAdminCmd("sm_ban", Command_Ban, ADMFLAG_BAN);
+    RegAdminCmd("sm_cat", Command_CAT, ADMFLAG_ROOT);
 
     RegServerCmd("reloadadmins", Command_ReloadAdmins);
     
     LoadTranslations("basebans.phrases");
+    LoadTranslations("common.phrases");
     
     g_FlagBits['a'-'a'] = Admin_Reservation;
     g_FlagBits['b'-'a'] = Admin_Generic;
@@ -515,6 +517,44 @@ public Action Timer_ReloadAdmins(Handle timer)
     DumpAdminCache(AdminCache_Admins, true);
     PrintToServer("[FCCSGO-Bans]  Reloading Admins list...");
     return Plugin_Stop;
+}
+
+public Action Command_CAT(int client, int args)
+{
+    if(args < 2)
+    {
+        ReplyToCommand(client, "\x04用法\x01: sm_ban <#userid或者名字> <原因>");
+        return Plugin_Handled;
+    }
+    
+    int admin = client;
+
+    char buffer[64];
+    GetCmdArg(1, buffer, 64);
+    int target = FindTarget(client, buffer, true);
+    if(target == -1)
+    {
+        ReplyToCommand(client, "目标无效");
+        return Plugin_Handled;
+    }
+
+    char reason[256];
+    for(int i = 2; i <= args; i++)
+    {
+        GetCmdArg(i, buffer, 64);
+        Format(reason, 256, "%s %s", reason, buffer);
+    }
+
+    g_eBan[admin][iTarget]  = target;
+    g_eBan[admin][iLength]  = 0;
+    g_eBan[admin][iBanType] = 0;
+    g_eBan[admin][banProc]  = ban_Client;
+
+    FormatEx(g_eBan[admin][szReason], 256, "CAT: %s", reason);
+
+    Util_BanClient(-1, g_eBan[admin][iTarget], g_eBan[admin][iBanType], g_eBan[admin][iLength], g_eBan[admin][szReason]);
+
+    return Plugin_Handled;
 }
 
 public Action Command_Ban(int client, int args)
@@ -732,7 +772,7 @@ public void OnClientAuthorized(int client, const char[] authId)
     g_smUserIPpt.SetString(steamid, ippt, true);
 
     char m_szQuery[256];
-    FormatEx(m_szQuery, 256, "SELECT bType, bSrv, bSrvMod, bCreated, bLength, bReason, id FROM k_bans WHERE steamid = '%s' AND bRemovedBy = -1", steamid);
+    FormatEx(m_szQuery, 256, "SELECT bType, bSrv, bSrvMod, bCreated, bLength, bReason, bAdminName, id FROM k_bans WHERE steamid = '%s' AND bRemovedBy = -1", steamid);
     FC_Core_GetMySQL().Query(CheckBanCallback, m_szQuery, GetClientUserId(client));
 }
 
@@ -756,13 +796,14 @@ public void CheckBanCallback(Database db, DBResultSet results, const char[] erro
     {
         //bType, bSrv, bSrvMod, bCreated, bLength, bReason, id
 
-        char bReason[32];
+        char bReason[128], bAdminName[32];
         int bType    = results.FetchInt(0);
         int bSrv     = results.FetchInt(1);
         int bSrvMod  = results.FetchInt(2);
         int bCreated = results.FetchInt(3);
         int bLength  = results.FetchInt(4);
-        results.FetchString(5, bReason, 32);
+        results.FetchString(5, bReason,     128);
+        results.FetchString(6, bAdminName,   32);
 
         /* process results */
         
@@ -790,7 +831,7 @@ public void CheckBanCallback(Database db, DBResultSet results, const char[] erro
             FormatEx(timeExpired, 64, "永久封禁");
 
         char kickReason[256];
-        FormatEx(kickReason, 256, "您已被服务器封锁,禁止进入游戏!\n类型: %s\n原因: %s\n到期: %s\n访问https://fccsgo.com/查看详细信息", g_banType[bType], bReason, timeExpired);
+        FormatEx(kickReason, 256, "您已被服务器封锁,禁止进入游戏!\n封禁类型:\t%s\n封禁原因:\t%s\n操作人员:\t%s\n到期时间:\t%s\n访问https://fccsgo.com/查看详细信息", g_banType[bType], bReason, bAdminName, timeExpired);
         BanClient(client, 10, BANFLAG_AUTHID, kickReason, kickReason);
 
         break;

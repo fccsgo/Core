@@ -50,10 +50,13 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
         return Plugin_Continue;
     
     if(strlen(sArgs) <= 3)
-        return Plugin_Handled;
+        return Plugin_Continue;
 
     if(strcmp(command, "say", false) == 0)
     {
+        if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
+            return Plugin_Continue;
+
         switch(sArgs[0])
         {
             case '@': Utils_Asay(client, sArgs[1]);
@@ -81,9 +84,6 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
 
 void Utils_Asay(int client, const char[] message)
 {
-    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
-        return;
-    
     SetHudTextParams(-1.0, 0.225, 8.0, 255, 0, 0, 255, 1, 5.0, 1.0, 2.0);
 
     for(int target = 1; target <= MaxClients; ++target)
@@ -101,27 +101,18 @@ void Utils_Asay(int client, const char[] message)
 
 void Utils_Csay(int client, const char[] message)
 {
-    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
-        return;
-    
     TextAll("<font color='#0066CC'><span class='fontSize-xl'>%N</span></font>\n%s", client, message);
     LogAction(client, -1, "\"%L\" 使用CSAY: %s", client, message);
 }
 
 void Utils_Hsay(int client, const char[] message)
 {
-    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
-        return;
-    
     HintAll("<font color='#0066CC'><span class='fontSize-xl'>%N</span></font>\n%s", client, message);
     LogAction(client, -1, "\"%L\" 使用HSAY: %s", client, message);
 }
 
 void Utils_Msay(int client, const char[] message)
 {
-    if(!CheckCommandAccess(client, "sm_chat", ADMFLAG_CHAT))
-        return;
-
     if(g_hMenuHud != null)
         delete g_hMenuHud;
     

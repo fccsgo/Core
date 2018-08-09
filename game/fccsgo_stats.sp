@@ -400,7 +400,7 @@ public void MySQL_VoidQueryCallback(Database db, DBResultSet results, const char
         
         char path[256];
         BuildPath(Path_SM, path, 256, "logs/MySQL_VoidQueryError.log");
-        
+
         LogToFileEx(path, "----------------------------------------------------------------");
         LogToFileEx(path, "Query: %s", m_szQuery);
         LogToFileEx(path, "Error: %s", error);
@@ -415,5 +415,7 @@ static int GetClientOnline(int client)
 
 static void LogSQL(const char[] buffer)
 {
-    LogToFileEx("addons/sourcemod/data/MySQL_Query.log", buffer);
+    char path[256];
+    BuildPath(Path_SM, path, 256, "data/MySQL_Query.log");
+    LogToFileEx(path, buffer);
 }
